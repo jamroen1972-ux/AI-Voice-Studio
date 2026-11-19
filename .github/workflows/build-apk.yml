@@ -25,6 +25,9 @@ jobs:
         shell: bash
         run: |
           cp android-overlay/app/src/main/java/com/example/aivoicestudio/MainActivity.java extracted/AI-Voice-Studio/app/src/main/java/com/example/aivoicestudio/MainActivity.java
+          mkdir -p extracted/AI-Voice-Studio/app/src/main/res/drawable-nodpi
+          base64 --decode android-overlay/portraits_sprite.jpg.base64 > extracted/AI-Voice-Studio/app/src/main/res/drawable-nodpi/portrait_sprite.jpg
+          file extracted/AI-Voice-Studio/app/src/main/res/drawable-nodpi/portrait_sprite.jpg
           sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET" />|' extracted/AI-Voice-Studio/app/src/main/AndroidManifest.xml
       - uses: actions/setup-java@v5
         with:
