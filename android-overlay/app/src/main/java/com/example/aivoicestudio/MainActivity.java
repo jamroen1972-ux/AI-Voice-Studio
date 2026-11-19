@@ -31,6 +31,9 @@ public class MainActivity extends Activity {
   private static final String[] STYLE_PROMPTS={"Speak in a youthful, playful, childlike feminine character voice with clear natural pronunciation.","Speak in a youthful, playful, childlike masculine character voice with clear natural pronunciation.","Speak as a gentle elderly grandfather character, with a mature warm slightly weathered tone, unhurried pacing, and clear Thai pronunciation.","Speak as a kind elderly grandmother character, with a mature warm slightly weathered tone, unhurried pacing, and clear Thai pronunciation.","Speak naturally and clearly.","Speak warmly and conversationally.","Speak cheerfully and playfully.","Speak professionally like a news presenter.","Narrate like a documentary presenter.","Speak softly and calmly.","Speak with excitement and energy.","Speak persuasively like a polished commercial.","Tell the story expressively and gently.","Speak slowly with very clear articulation."};
   private EditText script,keyField,instructions;
   private Button keySaveButton,keyEditButton;
+  private LinearLayout keyList;
+  private EditText keyNameField;
+  private int editingKeyIndex=-1;
   private boolean keyLocked=false;
   private void setKeyLocked(boolean locked){
     keyLocked=locked;
@@ -85,24 +88,35 @@ public class MainActivity extends Activity {
     studioTab.setOnClickListener(v->{studio.setVisibility(View.VISIBLE);settings.setVisibility(View.GONE);studioTab.setAlpha(1f);settingsTab.setAlpha(.65f);});
     settingsTab.setOnClickListener(v->{studio.setVisibility(View.GONE);settings.setVisibility(View.VISIBLE);studioTab.setAlpha(.65f);settingsTab.setAlpha(1f);});
     settingsTab.setAlpha(.65f);
-    add(settings,label("🔐 ตั้งค่า Gemini API Key"),12);
-    TextView help=label("คีย์จะถูกเก็บเข้ารหัสในมือถือ ไม่แสดงใน GitHub");help.setTextColor(0xffaab6d5);help.setTextSize(12);add(settings,help,6);
-    keyField=edit("วาง Gemini API Key",1);keyField.setSingleLine(true);keyField.setInputType(129);add(settings,keyField,12);
-    keySaveButton=button("บันทึก API Key");add(settings,keySaveButton,10);
-    keyEditButton=button("✎ แก้ไข / เปลี่ยน API Key");add(settings,keyEditButton,10);
+    add(settings,label("🔐 จัดการ Gemini API Key หลายบัญชี"),12);
+    TextView help=label("เลือกเปิดใช้งานได้ทีละคีย์ • คีย์เก็บเข้ารหัสในมือถือ");help.setTextColor(0xffaab6d5);help.setTextSize(12);add(settings,help,6);
+    keyList=new LinearLayout(this);keyList.setOrientation(1);add(settings,keyList,12);
+    keyNameField=edit("ชื่อบัญชี เช่น Google บัญชี 2",1);keyNameField.setSingleLine(true);add(settings,keyNameField,12);
+    keyField=edit("วาง Gemini API Key ใหม่",1);keyField.setSingleLine(true);keyField.setInputType(129);add(settings,keyField,8);
+    keySaveButton=button("＋ เพิ่ม API Key");add(settings,keySaveButton,10);
+    keyEditButton=button("ยกเลิกการแก้ไข");add(settings,keyEditButton,8);keyEditButton.setVisibility(View.GONE);
     keySaveButton.setOnClickListener(v->{
       String newKey=keyField.getText().toString().trim();
+      String name=keyNameField.getText().toString().trim();
       if(newKey.isEmpty()){message("กรุณากรอก API Key ก่อนบันทึก");return;}
-      try{saveKey(newKey);setKeyLocked(true);message("บันทึกคีย์แบบเข้ารหัสและล็อกช่องเรียบร้อย");}
-      catch(Exception ex){message("บันทึกคีย์ไม่สำเร็จ: "+ex.getMessage());}
+      try{
+        JSONObject data=readKeyStore();
+        JSONArray items=data.getJSONArray("items");
+        if(editingKeyIndex>=0&&editingKeyIndex<items.length()){
+          JSONObject old=items.getJSONObject(editingKeyIndex);
+          old.put("name",name.isEmpty()?old.optString("name","บัญชี "+(editingKeyIndex+1)):name);
+          old.put("value",newKey);
+        }else{
+          JSONObject item=new JSONObject().put("name",name.isEmpty()?"บัญชี "+(items.length()+1):name).put("value",newKey);
+          items.put(item);
+          if(items.length()==1)data.put("active",0);
+        }
+        saveKey(data.toString());
+        resetKeyEditor();refreshKeyList();message("บันทึก API Key แบบเข้ารหัสเรียบร้อย");
+      }catch(Exception ex){message("บันทึกไม่สำเร็จ: "+ex.getMessage());}
     });
-    keyEditButton.setOnClickListener(v->new AlertDialog.Builder(this)
-      .setTitle("เปลี่ยน API Key")
-      .setMessage("ต้องการแก้ไขคีย์ที่บันทึกไว้หรือไม่? คีย์เดิมจะยังใช้งานได้จนกว่าจะบันทึกคีย์ใหม่")
-      .setNegativeButton("ยกเลิก",null)
-      .setPositiveButton("แก้ไข",(dialog,which)->{setKeyLocked(false);message("กรอก API Key ใหม่แล้วกดบันทึก");})
-      .show());
-    setKeyLocked(!loadKey().isEmpty());
+    keyEditButton.setOnClickListener(v->{resetKeyEditor();message("ยกเลิกการแก้ไขแล้ว");});
+    refreshKeyList();
     TextView note=label("ต้องใช้อินเทอร์เน็ตและอาจมีค่าใช้จ่ายตามโควตา Google");note.setTextColor(0xffaab6d5);note.setTextSize(12);add(settings,note,18);
     add(studio,label("01  ข้อความพากย์"),16);
     script=edit("พิมพ์ข้อความที่ต้องการพากย์...",5);script.setText("สวัสดีค่ะ ยินดีต้อนรับสู่ AI Voice Studio");add(studio,script,8);
@@ -152,6 +166,64 @@ public class MainActivity extends Activity {
   private SecretKey secret()throws Exception{KeyStore ks=KeyStore.getInstance("AndroidKeyStore");ks.load(null);if(!ks.containsAlias("gemini_key")){KeyGenerator kg=KeyGenerator.getInstance("AES","AndroidKeyStore");kg.init(new KeyGenParameterSpec.Builder("gemini_key",KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes("GCM").setEncryptionPaddings("NoPadding").build());kg.generateKey();}return (SecretKey)ks.getKey("gemini_key",null);}
   private void saveKey(String value)throws Exception{Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.ENCRYPT_MODE,secret());byte[] enc=c.doFinal(value.getBytes(StandardCharsets.UTF_8));getPreferences(0).edit().putString("key",Base64.getEncoder().encodeToString(enc)).putString("iv",Base64.getEncoder().encodeToString(c.getIV())).apply();}
   private String loadKey(){try{String enc=getPreferences(0).getString("key",""),iv=getPreferences(0).getString("iv","");if(enc.isEmpty())return "";Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.DECRYPT_MODE,secret(),new GCMParameterSpec(128,Base64.getDecoder().decode(iv)));return new String(c.doFinal(Base64.getDecoder().decode(enc)),StandardCharsets.UTF_8);}catch(Exception e){return "";}}
+  private JSONObject readKeyStore()throws Exception{
+    String saved=loadKey();
+    if(saved.isEmpty())return new JSONObject().put("active",-1).put("items",new JSONArray());
+    try{
+      JSONObject obj=new JSONObject(saved);
+      if(obj.has("items")&&obj.optJSONArray("items")!=null)return obj;
+    }catch(JSONException ignored){}
+    // Migrate the original single encrypted key without losing it.
+    return new JSONObject().put("active",0).put("items",new JSONArray().put(new JSONObject().put("name","Google บัญชี 1").put("value",saved)));
+  }
+  private String activeApiKey(){
+    try{
+      JSONObject data=readKeyStore();
+      JSONArray items=data.getJSONArray("items");
+      int active=data.optInt("active",-1);
+      if(active>=0&&active<items.length())return items.getJSONObject(active).optString("value","");
+    }catch(Exception ignored){}
+    return "";
+  }
+  private void resetKeyEditor(){
+    editingKeyIndex=-1;keyNameField.setText("");keyField.setText("");
+    keySaveButton.setText("＋ เพิ่ม API Key");keyEditButton.setVisibility(View.GONE);
+  }
+  private void refreshKeyList(){
+    if(keyList==null)return;
+    keyList.removeAllViews();
+    try{
+      JSONObject data=readKeyStore();
+      JSONArray items=data.getJSONArray("items");
+      int active=data.optInt("active",-1);
+      if(items.length()==0){TextView empty=label("ยังไม่มี API Key • เพิ่มคีย์แรกด้านล่าง");empty.setTextColor(0xffaab6d5);add(keyList,empty,4);}
+      for(int i=0;i<items.length();i++){
+        final int index=i;
+        JSONObject item=items.getJSONObject(i);
+        LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(12),dp(12),dp(12),dp(12));card.setBackground(shape(i==active?0xff384468:panel));add(keyList,card,8);
+        String name=item.optString("name","บัญชี "+(i+1));
+        TextView heading=label(name+(i==active?"  ✓ เปิดใช้งาน":"  • ยังไม่เลือก"));heading.setTextSize(15);add(card,heading,0);
+        String value=item.optString("value","");
+        TextView masked=label("••••••••••••"+(value.length()>4?value.substring(value.length()-4):""));masked.setTextColor(0xffaab6d5);masked.setTextSize(12);add(card,masked,5);
+        LinearLayout controls=new LinearLayout(this);controls.setOrientation(0);add(card,controls,8);
+        Button activate=button(i==active?"✓ กำลังใช้":"เปิดใช้งาน");activate.setEnabled(i!=active);
+        controls.addView(activate,new LinearLayout.LayoutParams(0,dp(44),2));
+        activate.setOnClickListener(v->{try{JSONObject d=readKeyStore();d.put("active",index);saveKey(d.toString());refreshKeyList();message("เปิดใช้งาน "+name+" แล้ว");}catch(Exception e){message("เปลี่ยนคีย์ไม่สำเร็จ: "+e.getMessage());}});
+        Button editButton=button("แก้ไข");LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(0,dp(44),1);ep.leftMargin=dp(5);controls.addView(editButton,ep);
+        editButton.setOnClickListener(v->{editingKeyIndex=index;keyNameField.setText(name);keyField.setText("");keyField.setHint("วางคีย์ใหม่สำหรับ "+name);keySaveButton.setText("บันทึกการแก้ไข");keyEditButton.setVisibility(View.VISIBLE);message("ใส่ API Key ใหม่เพื่อแทนคีย์ของ "+name);});
+        Button deleteButton=button("ลบ");LinearLayout.LayoutParams delp=new LinearLayout.LayoutParams(0,dp(44),1);delp.leftMargin=dp(5);controls.addView(deleteButton,delp);
+        deleteButton.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("ลบ "+name+"?").setMessage("ลบคีย์นี้ออกจากมือถือโดยถาวรหรือไม่?").setNegativeButton("ยกเลิก",null).setPositiveButton("ลบ",(dialog,which)->{
+          try{
+            JSONObject d=readKeyStore();JSONArray arr=d.getJSONArray("items");JSONArray remaining=new JSONArray();
+            for(int j=0;j<arr.length();j++)if(j!=index)remaining.put(arr.getJSONObject(j));
+            int current=d.optInt("active",-1);
+            int next=remaining.length()==0?-1:current==index?0:current>index?current-1:current;
+            d.put("items",remaining).put("active",next);saveKey(d.toString());resetKeyEditor();refreshKeyList();message("ลบ "+name+" แล้ว");
+          }catch(Exception e){message("ลบไม่สำเร็จ: "+e.getMessage());}
+        }).show());
+      }
+    }catch(Exception e){TextView err=label("อ่านข้อมูลคีย์ไม่ได้: "+e.getMessage());add(keyList,err,4);}
+  }
   private String quotaMessage(JSONObject error){
     String raw=error.optString("message","");
     String lower=raw.toLowerCase(java.util.Locale.ROOT);
@@ -179,7 +251,7 @@ public class MainActivity extends Activity {
     String result=daily?"ใช้โควตาสร้างเสียงรายวันครบแล้ว":"มีการเรียกใช้งาน Gemini มากเกินขีดจำกัด";
     return result+(wait.isEmpty()?" กรุณาลองใหม่ภายหลัง":" กรุณารอประมาณ "+wait+" แล้วลองใหม่อีกครั้ง");
   }
-  private void generate(){String key=keyLocked?loadKey():keyField.getText().toString().trim(),words=script.getText().toString().trim();if(key.isEmpty()||words.isEmpty()){message("กรุณากรอก API Key และข้อความ");return;}String chosenVoice=VOICES[voice.getSelectedItemPosition()],lang=codes[language.getSelectedItemPosition()],style=instructions.getText().toString().trim();message("กำลังสร้างเสียงด้วย Gemini…");audio=null;
+  private void generate(){String key=activeApiKey(),words=script.getText().toString().trim();if(key.isEmpty()||words.isEmpty()){message("กรุณากรอก API Key และข้อความ");return;}String chosenVoice=VOICES[voice.getSelectedItemPosition()],lang=codes[language.getSelectedItemPosition()],style=instructions.getText().toString().trim();message("กำลังสร้างเสียงด้วย Gemini…");audio=null;
     new Thread(()->{HttpURLConnection con=null;try{
       URL url=new URL("https://generativelanguage.googleapis.com/v1beta/models/"+MODEL+":generateContent");con=(HttpURLConnection)url.openConnection();con.setRequestMethod("POST");con.setConnectTimeout(20000);con.setReadTimeout(120000);con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json");con.setRequestProperty("x-goog-api-key",key);
       JSONObject speech=new JSONObject().put("voiceConfig",new JSONObject().put("prebuiltVoiceConfig",new JSONObject().put("voiceName",chosenVoice)));
