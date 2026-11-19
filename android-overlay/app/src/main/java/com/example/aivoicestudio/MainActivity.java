@@ -28,6 +28,19 @@ public class MainActivity extends Activity {
   private static final String[] STYLES={"แนวเสียงเด็กผู้หญิง","แนวเสียงเด็กผู้ชาย","แนวเสียงคุณตา (ผู้สูงอายุชาย)","แนวเสียงคุณยาย (ผู้สูงอายุหญิง)","ธรรมชาติ","อบอุ่นและเป็นกันเอง","สดใส สนุกสนาน","จริงจังแบบผู้ประกาศข่าว","เล่าเรื่องสารคดี","นุ่มนวล ผ่อนคลาย","ตื่นเต้น เร้าใจ","โฆษณาสินค้า","เล่านิทาน","อ่านช้าและชัดเจน"};
   private static final String[] STYLE_PROMPTS={"Speak in a youthful, playful, childlike feminine character voice with clear natural pronunciation.","Speak in a youthful, playful, childlike masculine character voice with clear natural pronunciation.","Speak as a gentle elderly grandfather character, with a mature warm slightly weathered tone, unhurried pacing, and clear Thai pronunciation.","Speak as a kind elderly grandmother character, with a mature warm slightly weathered tone, unhurried pacing, and clear Thai pronunciation.","Speak naturally and clearly.","Speak warmly and conversationally.","Speak cheerfully and playfully.","Speak professionally like a news presenter.","Narrate like a documentary presenter.","Speak softly and calmly.","Speak with excitement and energy.","Speak persuasively like a polished commercial.","Tell the story expressively and gently.","Speak slowly with very clear articulation."};
   private EditText script,keyField,instructions;
+  private Button keySaveButton,keyEditButton;
+  private boolean keyLocked=false;
+  private void setKeyLocked(boolean locked){
+    keyLocked=locked;
+    keyField.setEnabled(!locked);
+    keyField.setFocusable( !locked );
+    keyField.setFocusableInTouchMode(!locked);
+    keyField.setTextColor(locked?0xff8e97ae:Color.WHITE);
+    keyField.setAlpha(locked?.55f:1f);
+    keySaveButton.setVisibility(locked?View.GONE:View.VISIBLE);
+    keyEditButton.setVisibility(locked?View.VISIBLE:View.GONE);
+    if(locked){keyField.setText("••••••••••••••••");}else{keyField.setText("");keyField.requestFocus();}
+  }
   private Spinner voice,language,style;
   private TextView voiceAvatar;
   private final Button[] characterButtons=new Button[6];
@@ -73,8 +86,21 @@ public class MainActivity extends Activity {
     add(settings,label("🔐 ตั้งค่า Gemini API Key"),12);
     TextView help=label("คีย์จะถูกเก็บเข้ารหัสในมือถือ ไม่แสดงใน GitHub");help.setTextColor(0xffaab6d5);help.setTextSize(12);add(settings,help,6);
     keyField=edit("วาง Gemini API Key",1);keyField.setSingleLine(true);keyField.setInputType(129);add(settings,keyField,12);
-    String stored=loadKey();if(!stored.isEmpty())keyField.setText(stored);
-    Button store=button("บันทึก API Key");add(settings,store,10);store.setOnClickListener(v->{try{saveKey(keyField.getText().toString().trim());message("บันทึกคีย์แบบเข้ารหัสแล้ว");}catch(Exception ex){message("บันทึกคีย์ไม่สำเร็จ: "+ex.getMessage());}});
+    keySaveButton=button("บันทึก API Key");add(settings,keySaveButton,10);
+    keyEditButton=button("✎ แก้ไข / เปลี่ยน API Key");add(settings,keyEditButton,10);
+    keySaveButton.setOnClickListener(v->{
+      String newKey=keyField.getText().toString().trim();
+      if(newKey.isEmpty()){message("กรุณากรอก API Key ก่อนบันทึก");return;}
+      try{saveKey(newKey);setKeyLocked(true);message("บันทึกคีย์แบบเข้ารหัสและล็อกช่องเรียบร้อย");}
+      catch(Exception ex){message("บันทึกคีย์ไม่สำเร็จ: "+ex.getMessage());}
+    });
+    keyEditButton.setOnClickListener(v->new AlertDialog.Builder(this)
+      .setTitle("เปลี่ยน API Key")
+      .setMessage("ต้องการแก้ไขคีย์ที่บันทึกไว้หรือไม่? คีย์เดิมจะยังใช้งานได้จนกว่าจะบันทึกคีย์ใหม่")
+      .setNegativeButton("ยกเลิก",null)
+      .setPositiveButton("แก้ไข",(dialog,which)->{setKeyLocked(false);message("กรอก API Key ใหม่แล้วกดบันทึก");})
+      .show());
+    setKeyLocked(!loadKey().isEmpty());
     TextView note=label("ต้องใช้อินเทอร์เน็ตและอาจมีค่าใช้จ่ายตามโควตา Google");note.setTextColor(0xffaab6d5);note.setTextSize(12);add(settings,note,18);
     add(studio,label("01  ข้อความพากย์"),16);
     script=edit("พิมพ์ข้อความที่ต้องการพากย์...",5);script.setText("สวัสดีค่ะ ยินดีต้อนรับสู่ AI Voice Studio");add(studio,script,8);
@@ -113,7 +139,7 @@ public class MainActivity extends Activity {
   private SecretKey secret()throws Exception{KeyStore ks=KeyStore.getInstance("AndroidKeyStore");ks.load(null);if(!ks.containsAlias("gemini_key")){KeyGenerator kg=KeyGenerator.getInstance("AES","AndroidKeyStore");kg.init(new KeyGenParameterSpec.Builder("gemini_key",KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes("GCM").setEncryptionPaddings("NoPadding").build());kg.generateKey();}return (SecretKey)ks.getKey("gemini_key",null);}
   private void saveKey(String value)throws Exception{Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.ENCRYPT_MODE,secret());byte[] enc=c.doFinal(value.getBytes(StandardCharsets.UTF_8));getPreferences(0).edit().putString("key",Base64.getEncoder().encodeToString(enc)).putString("iv",Base64.getEncoder().encodeToString(c.getIV())).apply();}
   private String loadKey(){try{String enc=getPreferences(0).getString("key",""),iv=getPreferences(0).getString("iv","");if(enc.isEmpty())return "";Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.DECRYPT_MODE,secret(),new GCMParameterSpec(128,Base64.getDecoder().decode(iv)));return new String(c.doFinal(Base64.getDecoder().decode(enc)),StandardCharsets.UTF_8);}catch(Exception e){return "";}}
-  private void generate(){String key=keyField.getText().toString().trim(),words=script.getText().toString().trim();if(key.isEmpty()||words.isEmpty()){message("กรุณากรอก API Key และข้อความ");return;}String chosenVoice=VOICES[voice.getSelectedItemPosition()],lang=codes[language.getSelectedItemPosition()],style=instructions.getText().toString().trim();message("กำลังสร้างเสียงด้วย Gemini…");audio=null;
+  private void generate(){String key=keyLocked?loadKey():keyField.getText().toString().trim(),words=script.getText().toString().trim();if(key.isEmpty()||words.isEmpty()){message("กรุณากรอก API Key และข้อความ");return;}String chosenVoice=VOICES[voice.getSelectedItemPosition()],lang=codes[language.getSelectedItemPosition()],style=instructions.getText().toString().trim();message("กำลังสร้างเสียงด้วย Gemini…");audio=null;
     new Thread(()->{HttpURLConnection con=null;try{
       URL url=new URL("https://generativelanguage.googleapis.com/v1beta/models/"+MODEL+":generateContent");con=(HttpURLConnection)url.openConnection();con.setRequestMethod("POST");con.setConnectTimeout(20000);con.setReadTimeout(120000);con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json");con.setRequestProperty("x-goog-api-key",key);
       JSONObject speech=new JSONObject().put("voiceConfig",new JSONObject().put("prebuiltVoiceConfig",new JSONObject().put("voiceName",chosenVoice)));
