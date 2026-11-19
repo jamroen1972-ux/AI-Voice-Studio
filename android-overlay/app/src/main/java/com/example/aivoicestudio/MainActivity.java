@@ -4,6 +4,8 @@ import android.app.*;
 import android.os.*;
 import android.content.*;
 import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.GradientDrawable;
 import android.media.*;
 import android.net.Uri;
@@ -43,15 +45,15 @@ public class MainActivity extends Activity {
   }
   private Spinner voice,language,style;
   private TextView voiceAvatar;
-  private final Button[] characterButtons=new Button[6];
-  private final String[] characterNames={"👧 เด็กผู้หญิง","👦 เด็กผู้ชาย","👩 ผู้หญิง","👨 ผู้ชาย","👴 คุณตา","👵 คุณยาย"};
-  private final int[] characterVoices={5,1,7,2,22,29};
-  private final int[] characterStyles={0,1,5,4,2,3};
+  private final LinearLayout[] characterButtons=new LinearLayout[8];
+  private final String[] characterNames={"เด็กผู้หญิง","เด็กผู้ชาย","ผู้หญิง","ผู้ชาย","คุณตา","คุณยาย","นักพากย์ชาย","นักพากย์หญิง"};
+  private final int[] characterVoices={5,1,7,2,22,29,11,0};
+  private final int[] characterStyles={0,1,5,4,2,3,8,7};
   private int selectedCharacter=-1;
   private void selectCharacter(int index){
     selectedCharacter=index;
     for(int i=0;i<characterButtons.length;i++){
-      if(characterButtons[i]!=null){characterButtons[i].setBackground(shape(i==index?accent:panel));characterButtons[i].setAlpha(i==index?1f:.82f);}
+      if(characterButtons[i]!=null){characterButtons[i].setBackground(shape(i==index?accent:panel));characterButtons[i].setAlpha(i==index?1f:.9f);}
     }
     voice.setSelection(characterVoices[index]);style.setSelection(characterStyles[index]);
     voiceAvatar.setText(characterNames[index]+"  •  "+VOICE_LABELS[characterVoices[index]]);
@@ -105,14 +107,25 @@ public class MainActivity extends Activity {
     add(studio,label("01  ข้อความพากย์"),16);
     script=edit("พิมพ์ข้อความที่ต้องการพากย์...",5);script.setText("สวัสดีค่ะ ยินดีต้อนรับสู่ AI Voice Studio");add(studio,script,8);
     add(studio,label("02  เลือกตัวละครและเสียง"),18);
-    TextView characterHelp=label("เลือกตัวละครจาก 6 กลุ่ม แล้วปรับเสียงเพิ่มเติมได้");characterHelp.setTextSize(12);characterHelp.setTextColor(0xffaab6d5);add(studio,characterHelp,6);
+    TextView characterHelp=label("เลือกภาพตัวละคร 8 แบบ แล้วปรับเสียง Gemini เพิ่มเติมได้");characterHelp.setTextSize(12);characterHelp.setTextColor(0xffaab6d5);add(studio,characterHelp,6);
+    Bitmap portraitSprite=BitmapFactory.decodeResource(getResources(),R.drawable.portrait_sprite);
     LinearLayout characterGrid=new LinearLayout(this);characterGrid.setOrientation(1);add(studio,characterGrid,10);
     for(int row=0;row<2;row++){
       LinearLayout line=new LinearLayout(this);line.setOrientation(LinearLayout.HORIZONTAL);characterGrid.addView(line);
-      for(int col=0;col<3;col++){
-        final int index=row*3+col;
-        Button card=button(characterNames[index]);card.setTextSize(13);card.setGravity(Gravity.CENTER);card.setPadding(dp(4),dp(12),dp(4),dp(12));card.setBackground(shape(panel));
-        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(84),1);if(col>0)cp.leftMargin=dp(7);if(row>0)cp.topMargin=dp(8);line.addView(card,cp);
+      for(int col=0;col<4;col++){
+        final int index=row*4+col;
+        LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setGravity(Gravity.CENTER);card.setPadding(dp(3),dp(3),dp(3),dp(5));card.setBackground(shape(panel));
+        ImageView photo=new ImageView(this);
+        if(portraitSprite!=null){
+          int tileW=portraitSprite.getWidth()/4,tileH=portraitSprite.getHeight()/2;
+          Bitmap portrait=Bitmap.createBitmap(portraitSprite,col*tileW,row*tileH,tileW,tileH);
+          photo.setImageBitmap(portrait);
+        }
+        photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        card.addView(photo,new LinearLayout.LayoutParams(-1,dp(75)));
+        TextView name=label(characterNames[index]);name.setTextSize(11);name.setGravity(Gravity.CENTER);name.setSingleLine(true);name.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams nameParams=new LinearLayout.LayoutParams(-1,dp(28));card.addView(name,nameParams);
+        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(111),1);if(col>0)cp.leftMargin=dp(5);if(row>0)cp.topMargin=dp(8);line.addView(card,cp);
         characterButtons[index]=card;card.setOnClickListener(v->selectCharacter(index));
       }
     }
