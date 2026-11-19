@@ -46,30 +46,44 @@ public class MainActivity extends Activity {
   private void message(String s){runOnUiThread(()->status.setText(s));}
   @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);
     ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(bg);LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(18),dp(24),dp(18),dp(30));scroll.addView(root);setContentView(scroll);
-    TextView title=label("✦ AI Voice Studio • Gemini");title.setTextSize(25);add(root,title,0);
-    add(root,label("Gemini API Key (เก็บเข้ารหัสในเครื่อง)"),22);
-    keyField=edit("วาง Gemini API Key",1);keyField.setSingleLine(true);keyField.setInputType(129);add(root,keyField,8);
+    TextView title=label("✦ AI Voice Studio");title.setTextSize(26);add(root,title,0);
+    TextView subtitle=label("สร้างเสียงพากย์ AI • Gemini");subtitle.setTextColor(0xffaab6d5);subtitle.setTextSize(13);add(root,subtitle,4);
+    LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);add(root,nav,20);
+    Button studioTab=button("🎙 สตูดิโอ"), settingsTab=button("⚙ ตั้งค่า");
+    nav.addView(studioTab,new LinearLayout.LayoutParams(0,dp(50),1));
+    LinearLayout.LayoutParams navp=new LinearLayout.LayoutParams(0,dp(50),1);navp.leftMargin=dp(8);nav.addView(settingsTab,navp);
+    LinearLayout studio=new LinearLayout(this);studio.setOrientation(1);add(root,studio,10);
+    LinearLayout settings=new LinearLayout(this);settings.setOrientation(1);add(root,settings,10);settings.setVisibility(View.GONE);
+    studioTab.setOnClickListener(v->{studio.setVisibility(View.VISIBLE);settings.setVisibility(View.GONE);studioTab.setAlpha(1f);settingsTab.setAlpha(.65f);});
+    settingsTab.setOnClickListener(v->{studio.setVisibility(View.GONE);settings.setVisibility(View.VISIBLE);studioTab.setAlpha(.65f);settingsTab.setAlpha(1f);});
+    settingsTab.setAlpha(.65f);
+    add(settings,label("🔐 ตั้งค่า Gemini API Key"),12);
+    TextView help=label("คีย์จะถูกเก็บเข้ารหัสในมือถือ ไม่แสดงใน GitHub");help.setTextColor(0xffaab6d5);help.setTextSize(12);add(settings,help,6);
+    keyField=edit("วาง Gemini API Key",1);keyField.setSingleLine(true);keyField.setInputType(129);add(settings,keyField,12);
     String stored=loadKey();if(!stored.isEmpty())keyField.setText(stored);
-    Button store=button("บันทึก API Key");add(root,store,8);store.setOnClickListener(v->{try{saveKey(keyField.getText().toString().trim());message("บันทึกคีย์แบบเข้ารหัสแล้ว");}catch(Exception ex){message("บันทึกคีย์ไม่สำเร็จ: "+ex.getMessage());}});
-    add(root,label("ข้อความพากย์"),20);script=edit("ใส่ข้อความที่ต้องการให้ AI พูด",5);script.setText("สวัสดีค่ะ ยินดีต้อนรับสู่ AI Voice Studio");add(root,script,8);
-    add(root,label("ภาษา"),18);language=spinner(languages);add(root,language,8);
-    add(root,label("เสียง Gemini AI"),18);
-    voiceAvatar=label("👩  เลือกเสียงเพื่อดูตัวละคร");voiceAvatar.setTextSize(19);voiceAvatar.setGravity(Gravity.CENTER);voiceAvatar.setPadding(dp(12),dp(18),dp(12),dp(18));voiceAvatar.setBackground(shape(panel));add(root,voiceAvatar,8);
-    voice=spinner(VOICE_LABELS);add(root,voice,8);
+    Button store=button("บันทึก API Key");add(settings,store,10);store.setOnClickListener(v->{try{saveKey(keyField.getText().toString().trim());message("บันทึกคีย์แบบเข้ารหัสแล้ว");}catch(Exception ex){message("บันทึกคีย์ไม่สำเร็จ: "+ex.getMessage());}});
+    TextView note=label("ต้องใช้อินเทอร์เน็ตและอาจมีค่าใช้จ่ายตามโควตา Google");note.setTextColor(0xffaab6d5);note.setTextSize(12);add(settings,note,18);
+    add(studio,label("01  ข้อความพากย์"),16);
+    script=edit("พิมพ์ข้อความที่ต้องการพากย์...",5);script.setText("สวัสดีค่ะ ยินดีต้อนรับสู่ AI Voice Studio");add(studio,script,8);
+    add(studio,label("02  เลือกตัวละครและเสียง"),18);
+    voiceAvatar=label("👩  Kore");voiceAvatar.setTextSize(25);voiceAvatar.setGravity(Gravity.CENTER);voiceAvatar.setPadding(dp(12),dp(18),dp(12),dp(18));voiceAvatar.setBackground(shape(panel));add(studio,voiceAvatar,8);
+    voice=spinner(VOICE_LABELS);add(studio,voice,10);
     voice.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
       public void onNothingSelected(android.widget.AdapterView<?> parent){}
       public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
         String[] portraits={"👩","👦","👨","👩","👦","👧","👨","👩","👧","👧","👨","👨","👨","👨","👩","👩","👨","👨","👧","👩","👨","👨","👨","👨","👨","👨","👩","👩","👨","👩"};
-        voiceAvatar.setText(portraits[position]+"  "+VOICE_LABELS[position]+"\nภาพตัวละครสัญลักษณ์ ไม่ใช่ภาพบุคคลจริง");
+        voiceAvatar.setText(portraits[position]+"\n"+VOICE_LABELS[position]);
       }
     });
-    add(root,label("รูปแบบการพากย์"),18);style=spinner(STYLES);add(root,style,8);
-    add(root,label("สไตล์การพูด (ไม่บังคับ)"),18);instructions=edit("เช่น พูดอย่างอบอุ่น ชัดเจน สนุกสนาน",2);add(root,instructions,8);
-    Button generate=button("▶ สร้างเสียง Gemini AI");add(root,generate,20);generate.setOnClickListener(v->generate());
-    Button play=button("▶ ฟังเสียงที่สร้าง");add(root,play,10);play.setOnClickListener(v->play());
-    Button save=button("↓ บันทึก WAV");add(root,save,10);save.setOnClickListener(v->saveAudio());
-    status=label("พร้อมใช้งาน • ใช้ API Key ส่วนตัวของคุณ");status.setTextSize(13);add(root,status,20);
-    TextView note=label("หมายเหตุ: ต้องเชื่อมต่ออินเทอร์เน็ต การใช้งาน API อาจมีค่าใช้จ่ายตามโควตา Google และเสียงที่เลือกไม่ใช่เสียงผู้ชาย/ผู้หญิงตายตัว");note.setTextColor(0xffaeb8ce);note.setTextSize(12);add(root,note,15);
+    add(studio,label("03  ภาษาและรูปแบบการพูด"),18);
+    language=spinner(languages);add(studio,language,8);
+    style=spinner(STYLES);add(studio,style,8);style.setSelection(2);
+    instructions=edit("คำสั่งเพิ่มเติม เช่น พูดอย่างอบอุ่น (ไม่บังคับ)",2);add(studio,instructions,8);
+    Button generate=button("✦ สร้างเสียง Gemini AI");add(studio,generate,20);generate.setOnClickListener(v->generate());
+    LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);add(studio,actions,10);
+    Button play=button("▶ ฟังเสียง");actions.addView(play,new LinearLayout.LayoutParams(0,dp(54),1));play.setOnClickListener(v->play());
+    Button save=button("↓ บันทึก WAV");LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(0,dp(54),1);ap.leftMargin=dp(8);actions.addView(save,ap);save.setOnClickListener(v->saveAudio());
+    status=label("พร้อมใช้งาน • เลือกเสียงแล้วกดสร้าง");status.setTextSize(13);status.setTextColor(0xffaab6d5);add(root,status,18);
   }
   private SecretKey secret()throws Exception{KeyStore ks=KeyStore.getInstance("AndroidKeyStore");ks.load(null);if(!ks.containsAlias("gemini_key")){KeyGenerator kg=KeyGenerator.getInstance("AES","AndroidKeyStore");kg.init(new KeyGenParameterSpec.Builder("gemini_key",KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes("GCM").setEncryptionPaddings("NoPadding").build());kg.generateKey();}return (SecretKey)ks.getKey("gemini_key",null);}
   private void saveKey(String value)throws Exception{Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.ENCRYPT_MODE,secret());byte[] enc=c.doFinal(value.getBytes(StandardCharsets.UTF_8));getPreferences(0).edit().putString("key",Base64.getEncoder().encodeToString(enc)).putString("iv",Base64.getEncoder().encodeToString(c.getIV())).apply();}
