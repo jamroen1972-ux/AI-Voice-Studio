@@ -23,9 +23,12 @@ import org.json.*;
 
 public class MainActivity extends Activity {
   private static final String MODEL="gemini-2.5-flash-preview-tts";
-  private static final String[] VOICES={"Kore","Puck","Charon","Aoede","Fenrir","Leda","Orus","Zephyr","Schedar","Achird","Gacrux","Pulcherrima","Sadachbia","Vindemiatrix","Zubenelgenubi"};
+  private static final String[] VOICES={"Zephyr","Puck","Charon","Kore","Fenrir","Leda","Orus","Aoede","Callirrhoe","Autonoe","Enceladus","Iapetus","Umbriel","Algieba","Despina","Erinome","Algenib","Rasalgethi","Laomedeia","Achernar","Alnilam","Schedar","Gacrux","Pulcherrima","Achird","Zubenelgenubi","Vindemiatrix","Sadachbia","Sadaltager","Sulafat"};
+  private static final String[] VOICE_LABELS={"Zephyr — สดใส","Puck — ร่าเริง","Charon — ให้ข้อมูล","Kore — หนักแน่น","Fenrir — ตื่นเต้น","Leda — อ่อนเยาว์","Orus — มั่นคง","Aoede — ผ่อนคลาย","Callirrhoe — สบาย ๆ","Autonoe — สดใส","Enceladus — นุ่มนวล","Iapetus — ชัดเจน","Umbriel — สบาย ๆ","Algieba — นุ่มนวล","Despina — เรียบลื่น","Erinome — ชัดเจน","Algenib — แหบเล็กน้อย","Rasalgethi — ให้ข้อมูล","Laomedeia — ร่าเริง","Achernar — นุ่มนวล","Alnilam — มั่นคง","Schedar — สม่ำเสมอ","Gacrux — ผู้ใหญ่","Pulcherrima — ตรงไปตรงมา","Achird — เป็นมิตร","Zubenelgenubi — สบาย ๆ","Vindemiatrix — อ่อนโยน","Sadachbia — มีชีวิตชีวา","Sadaltager — รอบรู้","Sulafat — อบอุ่น"};
+  private static final String[] STYLES={"ธรรมชาติ","อบอุ่นและเป็นกันเอง","สดใส สนุกสนาน","จริงจังแบบผู้ประกาศข่าว","เล่าเรื่องสารคดี","นุ่มนวล ผ่อนคลาย","ตื่นเต้น เร้าใจ","โฆษณาสินค้า","เล่านิทาน","อ่านช้าและชัดเจน"};
+  private static final String[] STYLE_PROMPTS={"Speak naturally and clearly.","Speak warmly and conversationally.","Speak cheerfully and playfully.","Speak professionally like a news presenter.","Narrate like a documentary presenter.","Speak softly and calmly.","Speak with excitement and energy.","Speak persuasively like a polished commercial.","Tell the story expressively and gently.","Speak slowly with very clear articulation."};
   private EditText script,keyField,instructions;
-  private Spinner voice,language;
+  private Spinner voice,language,style;
   private TextView status;
   private byte[] audio;
   private AudioTrack player;
@@ -49,7 +52,8 @@ public class MainActivity extends Activity {
     Button store=button("บันทึก API Key");add(root,store,8);store.setOnClickListener(v->{try{saveKey(keyField.getText().toString().trim());message("บันทึกคีย์แบบเข้ารหัสแล้ว");}catch(Exception ex){message("บันทึกคีย์ไม่สำเร็จ: "+ex.getMessage());}});
     add(root,label("ข้อความพากย์"),20);script=edit("ใส่ข้อความที่ต้องการให้ AI พูด",5);script.setText("สวัสดีค่ะ ยินดีต้อนรับสู่ AI Voice Studio");add(root,script,8);
     add(root,label("ภาษา"),18);language=spinner(languages);add(root,language,8);
-    add(root,label("เสียง Gemini AI"),18);voice=spinner(VOICES);add(root,voice,8);
+    add(root,label("เสียง Gemini AI"),18);voice=spinner(VOICE_LABELS);add(root,voice,8);
+    add(root,label("รูปแบบการพากย์"),18);style=spinner(STYLES);add(root,style,8);
     add(root,label("สไตล์การพูด (ไม่บังคับ)"),18);instructions=edit("เช่น พูดอย่างอบอุ่น ชัดเจน สนุกสนาน",2);add(root,instructions,8);
     Button generate=button("▶ สร้างเสียง Gemini AI");add(root,generate,20);generate.setOnClickListener(v->generate());
     Button play=button("▶ ฟังเสียงที่สร้าง");add(root,play,10);play.setOnClickListener(v->play());
