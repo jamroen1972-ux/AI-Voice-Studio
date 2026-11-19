@@ -5,6 +5,7 @@ on:
     paths:
       - 'AI-Voice-Studio-Android-Source.zip'
       - '.github/workflows/build-apk.yml'
+      - 'android-overlay/**'
   workflow_dispatch:
 jobs:
   build:
