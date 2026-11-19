@@ -32,7 +32,7 @@ public class MainActivity extends Activity {
   private EditText script,keyField,instructions;
   private Button keySaveButton,keyEditButton;
   private LinearLayout keyList;
-  private EditText keyNameField;
+  private EditText keyNameField,keyEmailField;
   private int editingKeyIndex=-1;
   private boolean keyLocked=false;
   private void setKeyLocked(boolean locked){
@@ -92,12 +92,15 @@ public class MainActivity extends Activity {
     TextView help=label("เลือกเปิดใช้งานได้ทีละคีย์ • คีย์เก็บเข้ารหัสในมือถือ");help.setTextColor(0xffaab6d5);help.setTextSize(12);add(settings,help,6);
     keyList=new LinearLayout(this);keyList.setOrientation(1);add(settings,keyList,12);
     keyNameField=edit("ชื่อบัญชี เช่น Google บัญชี 2",1);keyNameField.setSingleLine(true);add(settings,keyNameField,12);
+    keyEmailField=edit("Gmail เจ้าของคีย์ เช่น example@gmail.com",1);keyEmailField.setSingleLine(true);keyEmailField.setInputType(33);add(settings,keyEmailField,8);
     keyField=edit("วาง Gemini API Key ใหม่",1);keyField.setSingleLine(true);keyField.setInputType(129);add(settings,keyField,8);
     keySaveButton=button("＋ เพิ่ม API Key");add(settings,keySaveButton,10);
     keyEditButton=button("ยกเลิกการแก้ไข");add(settings,keyEditButton,8);keyEditButton.setVisibility(View.GONE);
     keySaveButton.setOnClickListener(v->{
       String newKey=keyField.getText().toString().trim();
       String name=keyNameField.getText().toString().trim();
+      String email=keyEmailField.getText().toString().trim();
+      if(!email.isEmpty()&&!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()){message("รูปแบบอีเมลไม่ถูกต้อง");return;}
       if(newKey.isEmpty()){message("กรุณากรอก API Key ก่อนบันทึก");return;}
       try{
         JSONObject data=readKeyStore();
@@ -105,9 +108,10 @@ public class MainActivity extends Activity {
         if(editingKeyIndex>=0&&editingKeyIndex<items.length()){
           JSONObject old=items.getJSONObject(editingKeyIndex);
           old.put("name",name.isEmpty()?old.optString("name","บัญชี "+(editingKeyIndex+1)):name);
+          old.put("email",email);
           old.put("value",newKey);
         }else{
-          JSONObject item=new JSONObject().put("name",name.isEmpty()?"บัญชี "+(items.length()+1):name).put("value",newKey);
+          JSONObject item=new JSONObject().put("name",name.isEmpty()?"บัญชี "+(items.length()+1):name).put("email",email).put("value",newKey);
           items.put(item);
           if(items.length()==1)data.put("active",0);
         }
@@ -186,7 +190,7 @@ public class MainActivity extends Activity {
     return "";
   }
   private void resetKeyEditor(){
-    editingKeyIndex=-1;keyNameField.setText("");keyField.setText("");
+    editingKeyIndex=-1;keyNameField.setText("");keyEmailField.setText("");keyField.setText("");
     keySaveButton.setText("＋ เพิ่ม API Key");keyEditButton.setVisibility(View.GONE);
   }
   private void refreshKeyList(){
@@ -203,6 +207,8 @@ public class MainActivity extends Activity {
         LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(12),dp(12),dp(12),dp(12));card.setBackground(shape(i==active?0xff384468:panel));add(keyList,card,8);
         String name=item.optString("name","บัญชี "+(i+1));
         TextView heading=label(name+(i==active?"  ✓ เปิดใช้งาน":"  • ยังไม่เลือก"));heading.setTextSize(15);add(card,heading,0);
+        String email=item.optString("email","");
+        TextView emailLabel=label(email.isEmpty()?"ยังไม่ได้ระบุ Gmail":email);emailLabel.setTextSize(12);emailLabel.setTextColor(0xffaab6d5);add(card,emailLabel,4);
         String value=item.optString("value","");
         TextView masked=label("••••••••••••"+(value.length()>4?value.substring(value.length()-4):""));masked.setTextColor(0xffaab6d5);masked.setTextSize(12);add(card,masked,5);
         LinearLayout controls=new LinearLayout(this);controls.setOrientation(0);add(card,controls,8);
@@ -210,7 +216,7 @@ public class MainActivity extends Activity {
         controls.addView(activate,new LinearLayout.LayoutParams(0,dp(44),2));
         activate.setOnClickListener(v->{try{JSONObject d=readKeyStore();d.put("active",index);saveKey(d.toString());refreshKeyList();message("เปิดใช้งาน "+name+" แล้ว");}catch(Exception e){message("เปลี่ยนคีย์ไม่สำเร็จ: "+e.getMessage());}});
         Button editButton=button("แก้ไข");LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(0,dp(44),1);ep.leftMargin=dp(5);controls.addView(editButton,ep);
-        editButton.setOnClickListener(v->{editingKeyIndex=index;keyNameField.setText(name);keyField.setText("");keyField.setHint("วางคีย์ใหม่สำหรับ "+name);keySaveButton.setText("บันทึกการแก้ไข");keyEditButton.setVisibility(View.VISIBLE);message("ใส่ API Key ใหม่เพื่อแทนคีย์ของ "+name);});
+        editButton.setOnClickListener(v->{editingKeyIndex=index;keyNameField.setText(name);keyEmailField.setText(email);keyField.setText("");keyField.setHint("วางคีย์ใหม่สำหรับ "+name);keySaveButton.setText("บันทึกการแก้ไข");keyEditButton.setVisibility(View.VISIBLE);message("ใส่ API Key ใหม่เพื่อแทนคีย์ของ "+name);});
         Button deleteButton=button("ลบ");LinearLayout.LayoutParams delp=new LinearLayout.LayoutParams(0,dp(44),1);delp.leftMargin=dp(5);controls.addView(deleteButton,delp);
         deleteButton.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("ลบ "+name+"?").setMessage("ลบคีย์นี้ออกจากมือถือโดยถาวรหรือไม่?").setNegativeButton("ยกเลิก",null).setPositiveButton("ลบ",(dialog,which)->{
           try{
