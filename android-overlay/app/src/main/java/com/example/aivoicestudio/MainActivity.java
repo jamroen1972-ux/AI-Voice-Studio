@@ -30,6 +30,19 @@ public class MainActivity extends Activity {
   private EditText script,keyField,instructions;
   private Spinner voice,language,style;
   private TextView voiceAvatar;
+  private final Button[] characterButtons=new Button[6];
+  private final String[] characterNames={"👧 เด็กผู้หญิง","👦 เด็กผู้ชาย","👩 ผู้หญิง","👨 ผู้ชาย","👴 คุณตา","👵 คุณยาย"};
+  private final int[] characterVoices={5,1,7,2,22,29};
+  private final int[] characterStyles={0,1,5,4,2,3};
+  private int selectedCharacter=-1;
+  private void selectCharacter(int index){
+    selectedCharacter=index;
+    for(int i=0;i<characterButtons.length;i++){
+      if(characterButtons[i]!=null){characterButtons[i].setBackground(shape(i==index?accent:panel));characterButtons[i].setAlpha(i==index?1f:.82f);}
+    }
+    voice.setSelection(characterVoices[index]);style.setSelection(characterStyles[index]);
+    voiceAvatar.setText(characterNames[index]+"  •  "+VOICE_LABELS[characterVoices[index]]);
+  }
   private TextView status;
   private byte[] audio;
   private AudioTrack player;
@@ -66,18 +79,30 @@ public class MainActivity extends Activity {
     add(studio,label("01  ข้อความพากย์"),16);
     script=edit("พิมพ์ข้อความที่ต้องการพากย์...",5);script.setText("สวัสดีค่ะ ยินดีต้อนรับสู่ AI Voice Studio");add(studio,script,8);
     add(studio,label("02  เลือกตัวละครและเสียง"),18);
-    voiceAvatar=label("👩  Kore");voiceAvatar.setTextSize(25);voiceAvatar.setGravity(Gravity.CENTER);voiceAvatar.setPadding(dp(12),dp(18),dp(12),dp(18));voiceAvatar.setBackground(shape(panel));add(studio,voiceAvatar,8);
-    voice=spinner(VOICE_LABELS);add(studio,voice,10);
+    TextView characterHelp=label("เลือกตัวละครจาก 6 กลุ่ม แล้วปรับเสียงเพิ่มเติมได้");characterHelp.setTextSize(12);characterHelp.setTextColor(0xffaab6d5);add(studio,characterHelp,6);
+    LinearLayout characterGrid=new LinearLayout(this);characterGrid.setOrientation(1);add(studio,characterGrid,10);
+    for(int row=0;row<2;row++){
+      LinearLayout line=new LinearLayout(this);line.setOrientation(LinearLayout.HORIZONTAL);characterGrid.addView(line);
+      for(int col=0;col<3;col++){
+        final int index=row*3+col;
+        Button card=button(characterNames[index]);card.setTextSize(13);card.setGravity(Gravity.CENTER);card.setPadding(dp(4),dp(12),dp(4),dp(12));card.setBackground(shape(panel));
+        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(84),1);if(col>0)cp.leftMargin=dp(7);if(row>0)cp.topMargin=dp(8);line.addView(card,cp);
+        characterButtons[index]=card;card.setOnClickListener(v->selectCharacter(index));
+      }
+    }
+    voiceAvatar=label("เลือกตัวละคร");voiceAvatar.setTextSize(14);voiceAvatar.setGravity(Gravity.CENTER);voiceAvatar.setPadding(dp(10),dp(12),dp(10),dp(12));voiceAvatar.setBackground(shape(panel));add(studio,voiceAvatar,12);
+    add(studio,label("เสียง Gemini (ปรับเองได้)"),10);
+    voice=spinner(VOICE_LABELS);add(studio,voice,8);
     voice.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
       public void onNothingSelected(android.widget.AdapterView<?> parent){}
       public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
-        String[] portraits={"👩","👦","👨","👩","👦","👧","👨","👩","👧","👧","👨","👨","👨","👨","👩","👩","👨","👨","👧","👩","👨","👨","👨","👨","👨","👨","👩","👩","👨","👩"};
-        voiceAvatar.setText(portraits[position]+"\n"+VOICE_LABELS[position]);
+        String character=selectedCharacter>=0?characterNames[selectedCharacter]:"เสียงทั่วไป";
+        voiceAvatar.setText(character+"  •  "+VOICE_LABELS[position]);
       }
     });
     add(studio,label("03  ภาษาและรูปแบบการพูด"),18);
     language=spinner(languages);add(studio,language,8);
-    style=spinner(STYLES);add(studio,style,8);style.setSelection(4);
+    style=spinner(STYLES);add(studio,style,8);style.setSelection(4);selectCharacter(0);
     instructions=edit("คำสั่งเพิ่มเติม เช่น พูดอย่างอบอุ่น (ไม่บังคับ)",2);add(studio,instructions,8);
     Button generate=button("✦ สร้างเสียง Gemini AI");add(studio,generate,20);generate.setOnClickListener(v->generate());
     LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);add(studio,actions,10);
