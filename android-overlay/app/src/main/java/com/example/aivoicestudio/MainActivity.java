@@ -152,6 +152,33 @@ public class MainActivity extends Activity {
   private SecretKey secret()throws Exception{KeyStore ks=KeyStore.getInstance("AndroidKeyStore");ks.load(null);if(!ks.containsAlias("gemini_key")){KeyGenerator kg=KeyGenerator.getInstance("AES","AndroidKeyStore");kg.init(new KeyGenParameterSpec.Builder("gemini_key",KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes("GCM").setEncryptionPaddings("NoPadding").build());kg.generateKey();}return (SecretKey)ks.getKey("gemini_key",null);}
   private void saveKey(String value)throws Exception{Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.ENCRYPT_MODE,secret());byte[] enc=c.doFinal(value.getBytes(StandardCharsets.UTF_8));getPreferences(0).edit().putString("key",Base64.getEncoder().encodeToString(enc)).putString("iv",Base64.getEncoder().encodeToString(c.getIV())).apply();}
   private String loadKey(){try{String enc=getPreferences(0).getString("key",""),iv=getPreferences(0).getString("iv","");if(enc.isEmpty())return "";Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.DECRYPT_MODE,secret(),new GCMParameterSpec(128,Base64.getDecoder().decode(iv)));return new String(c.doFinal(Base64.getDecoder().decode(enc)),StandardCharsets.UTF_8);}catch(Exception e){return "";}}
+  private String quotaMessage(JSONObject error){
+    String raw=error.optString("message","");
+    String lower=raw.toLowerCase(java.util.Locale.ROOT);
+    boolean daily=lower.contains("per day")||lower.contains("daily")||lower.contains("free_tier_requests");
+    String wait="";
+    java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?i)please retry in\\s*([0-9]+(?:\\.[0-9]+)?(?:h|m|s))+").matcher(raw);
+    if(m.find()){
+      String value=m.group().replaceFirst("(?i)please retry in\\s*","");
+      java.util.regex.Matcher unit=java.util.regex.Pattern.compile("([0-9]+)(?:\\.[0-9]+)?([hms])").matcher(value);
+      StringBuilder result=new StringBuilder();
+      while(unit.find()){if(result.length()>0)result.append(" ");String u=unit.group(2);result.append(unit.group(1)).append(u.equals("h")?" ชั่วโมง":u.equals("m")?" นาที":" วินาที");}
+      wait=result.toString();
+    }
+    if(wait.isEmpty()){
+      JSONArray details=error.optJSONArray("details");
+      if(details!=null)for(int i=0;i<details.length();i++){
+        JSONObject item=details.optJSONObject(i);
+        if(item!=null&&item.optString("@type","").endsWith("RetryInfo")){
+          String delay=item.optString("retryDelay","");
+          java.util.regex.Matcher sec=java.util.regex.Pattern.compile("([0-9]+)s").matcher(delay);
+          if(sec.find()){long seconds=Long.parseLong(sec.group(1));wait=(seconds/3600>0?(seconds/3600)+" ชั่วโมง ":"")+(seconds%3600/60>0?(seconds%3600/60)+" นาที ":"")+(seconds%60)+" วินาที";}
+        }
+      }
+    }
+    String result=daily?"ใช้โควตาสร้างเสียงรายวันครบแล้ว":"มีการเรียกใช้งาน Gemini มากเกินขีดจำกัด";
+    return result+(wait.isEmpty()?" กรุณาลองใหม่ภายหลัง":" กรุณารอประมาณ "+wait+" แล้วลองใหม่อีกครั้ง");
+  }
   private void generate(){String key=keyLocked?loadKey():keyField.getText().toString().trim(),words=script.getText().toString().trim();if(key.isEmpty()||words.isEmpty()){message("กรุณากรอก API Key และข้อความ");return;}String chosenVoice=VOICES[voice.getSelectedItemPosition()],lang=codes[language.getSelectedItemPosition()],style=instructions.getText().toString().trim();message("กำลังสร้างเสียงด้วย Gemini…");audio=null;
     new Thread(()->{HttpURLConnection con=null;try{
       URL url=new URL("https://generativelanguage.googleapis.com/v1beta/models/"+MODEL+":generateContent");con=(HttpURLConnection)url.openConnection();con.setRequestMethod("POST");con.setConnectTimeout(20000);con.setReadTimeout(120000);con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json");con.setRequestProperty("x-goog-api-key",key);
@@ -161,7 +188,7 @@ public class MainActivity extends Activity {
       JSONObject req=new JSONObject().put("contents",new JSONArray().put(new JSONObject().put("parts",new JSONArray().put(new JSONObject().put("text",prompt))))).put("generationConfig",config);
       try(OutputStream os=con.getOutputStream()){os.write(req.toString().getBytes(StandardCharsets.UTF_8));}
       int code=con.getResponseCode();InputStream stream=code<400?con.getInputStream():con.getErrorStream();ByteArrayOutputStream buffer=new ByteArrayOutputStream();byte[] chunk=new byte[8192];int n;while((n=stream.read(chunk))!=-1)buffer.write(chunk,0,n);JSONObject result=new JSONObject(buffer.toString("UTF-8"));
-      if(code>=400){JSONObject err=result.optJSONObject("error");throw new IOException("Google API "+code+": "+(err==null?"Request failed":err.optString("message")));}
+      if(code>=400){JSONObject err=result.optJSONObject("error");if(code==429){message(quotaMessage(err==null?new JSONObject():err));return;}throw new IOException("Google API "+code+": "+(err==null?"Request failed":err.optString("message")));}
       JSONArray parts=result.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts");String base64=null;for(int i=0;i<parts.length();i++){JSONObject inline=parts.getJSONObject(i).optJSONObject("inlineData");if(inline!=null){base64=inline.optString("data");break;}}
       if(base64==null||base64.isEmpty())throw new IOException("Gemini ไม่ส่งข้อมูลเสียงกลับมา");
       audio=Base64.getDecoder().decode(base64);message("สร้างเสียงสำเร็จ • "+audio.length+" bytes • กดฟังหรือบันทึก WAV");
