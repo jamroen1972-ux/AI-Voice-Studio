@@ -69,7 +69,7 @@ public class MainActivity extends Activity {
       URL url=new URL("https://generativelanguage.googleapis.com/v1beta/models/"+MODEL+":generateContent");con=(HttpURLConnection)url.openConnection();con.setRequestMethod("POST");con.setConnectTimeout(20000);con.setReadTimeout(120000);con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json");con.setRequestProperty("x-goog-api-key",key);
       JSONObject speech=new JSONObject().put("voiceConfig",new JSONObject().put("prebuiltVoiceConfig",new JSONObject().put("voiceName",chosenVoice)));
       JSONObject config=new JSONObject().put("responseModalities",new JSONArray().put("AUDIO")).put("speechConfig",speech);
-      String prompt="Speak the following text in "+lang+". "+(style.isEmpty()?"Use a natural, clear speaking style.":style)+"\n\n"+words;
+      String prompt="Speak the following text in "+lang+". "+(STYLE_PROMPTS[MainActivity.this.style.getSelectedItemPosition()]+(style.isEmpty()?"":" "+style))+"\n\n"+words;
       JSONObject req=new JSONObject().put("contents",new JSONArray().put(new JSONObject().put("parts",new JSONArray().put(new JSONObject().put("text",prompt))))).put("generationConfig",config);
       try(OutputStream os=con.getOutputStream()){os.write(req.toString().getBytes(StandardCharsets.UTF_8));}
       int code=con.getResponseCode();InputStream stream=code<400?con.getInputStream():con.getErrorStream();ByteArrayOutputStream buffer=new ByteArrayOutputStream();byte[] chunk=new byte[8192];int n;while((n=stream.read(chunk))!=-1)buffer.write(chunk,0,n);JSONObject result=new JSONObject(buffer.toString("UTF-8"));
