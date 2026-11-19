@@ -1,7 +1,10 @@
-name: Build Android APK
+name: Build Android APK from ZIP
 on:
   push:
     branches: [main]
+    paths:
+      - 'AI-Voice-Studio-Android-Source.zip'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 jobs:
   build:
@@ -10,19 +13,26 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Extract Android project
+        shell: bash
+        run: |
+          test -f AI-Voice-Studio-Android-Source.zip || { echo "Upload AI-Voice-Studio-Android-Source.zip to repository root first"; exit 1; }
+          mkdir -p extracted
+          unzip -q AI-Voice-Studio-Android-Source.zip -d extracted
+          test -f extracted/AI-Voice-Studio/settings.gradle || { echo "Android project missing in ZIP"; exit 1; }
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-      - name: Install Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
       - name: Build debug APK
+        working-directory: extracted/AI-Voice-Studio
         run: gradle --no-daemon assembleDebug
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: AI-Voice-Studio-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: extracted/AI-Voice-Studio/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
