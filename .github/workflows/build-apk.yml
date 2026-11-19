@@ -20,6 +20,11 @@ jobs:
           mkdir -p extracted
           unzip -q AI-Voice-Studio-Android-Source.zip -d extracted
           test -f extracted/AI-Voice-Studio/settings.gradle || { echo "Android project missing in ZIP"; exit 1; }
+      - name: Apply Gemini Android upgrade
+        shell: bash
+        run: |
+          cp android-overlay/app/src/main/java/com/example/aivoicestudio/MainActivity.java extracted/AI-Voice-Studio/app/src/main/java/com/example/aivoicestudio/MainActivity.java
+          sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET" />|' extracted/AI-Voice-Studio/app/src/main/AndroidManifest.xml
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
